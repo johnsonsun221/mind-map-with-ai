@@ -20,11 +20,11 @@ struct MindMapCanvas: View {
             Color(UIColor.systemGroupedBackground)
                 .ignoresSafeArea()
 
-            // 网格背景
-            GridPattern()
-                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                .scaleEffect(scale)
-                .offset(offset)
+            // 无限网格背景
+            GeometryReader { geometry in
+                InfiniteGridPattern(offset: offset, scale: scale, viewSize: geometry.size)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            }
 
             // 思维导图节点
             ForEach(viewModel.nodes) { node in
@@ -219,20 +219,44 @@ struct MindMapCanvas: View {
     }
 }
 
-// MARK: - 网格图案
-struct GridPattern: Shape {
+// MARK: - 无限网格图案
+struct InfiniteGridPattern: Shape {
+    let offset: CGSize
+    let scale: CGFloat
+    let viewSize: CGSize
+
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let spacing: CGFloat = 30
+        let spacing: CGFloat = 30 * scale
 
-        for x in stride(from: 0, to: rect.width, by: spacing) {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
+        // 计算可见区域（考虑 offset）
+        let visibleRect = CGRect(
+            x: -offset.width - spacing * 2,
+            y: -offset.height - spacing * 2,
+            width: viewSize.width + spacing * 4,
+            height: viewSize.height + spacing * 4
+        )
+
+        // 计算网格起始位置，对齐到网格
+        let startX = (floor(visibleRect.minX / spacing) * spacing)
+        let startY = (floor(visibleRect.minY / spacing) * spacing)
+        let endX = visibleRect.maxX
+        let endY = visibleRect.maxY
+
+        // 绘制垂直线
+        var x = startX
+        while x <= endX {
+            path.move(to: CGPoint(x: x, y: startY))
+            path.addLine(to: CGPoint(x: x, y: endY))
+            x += spacing
         }
 
-        for y in stride(from: 0, to: rect.height, by: spacing) {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
+        // 绘制水平线
+        var y = startY
+        while y <= endY {
+            path.move(to: CGPoint(x: startX, y: y))
+            path.addLine(to: CGPoint(x: endX, y: y))
+            y += spacing
         }
 
         return path
