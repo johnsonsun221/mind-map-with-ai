@@ -241,26 +241,24 @@ struct FloatingChatWindow: View {
     // MARK: - 处理拖放
     private func handleDrop(providers: [NSItemProvider]) {
         for provider in providers {
-            if provider.canLoadObject(ofClass: NSData.self) {
-                _ = provider.loadObject(ofClass: NSData.self) { data, error in
-                    guard let data = data as? Data,
-                          let draggedNode = try? JSONDecoder().decode(DraggedNode.self, from: data) else {
-                        return
-                    }
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.data.identifier) { data, error in
+                guard let data = data,
+                      let draggedNode = try? JSONDecoder().decode(DraggedNode.self, from: data) else {
+                    return
+                }
 
-                    DispatchQueue.main.async {
-                        let messageContent = "【来自思维导图】\n标题: \(draggedNode.title)\n内容: \(draggedNode.content)"
-                        let userMessage = ChatMessage(
-                            role: .user,
-                            content: messageContent,
-                            relatedNodeId: draggedNode.nodeId
-                        )
-                        messages.append(userMessage)
+                DispatchQueue.main.async {
+                    let messageContent = "【来自思维导图】\n标题: \(draggedNode.title)\n内容: \(draggedNode.content)"
+                    let userMessage = ChatMessage(
+                        role: .user,
+                        content: messageContent,
+                        relatedNodeId: draggedNode.nodeId
+                    )
+                    self.messages.append(userMessage)
 
-                        // 生成 AI 响应
-                        Task {
-                            await generateAIResponse(for: messageContent)
-                        }
+                    // 生成 AI 响应
+                    Task {
+                        await self.generateAIResponse(for: messageContent)
                     }
                 }
             }
