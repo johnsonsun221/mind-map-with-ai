@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 思维导图画布视图
 struct MindMapCanvas: View {
+    @ObservedObject var viewModel: MindMapViewModel
     @StateObject private var cloudKitManager = CloudKitManager()
-    @State private var nodes: [MindMapNode] = []
     @State private var selectedNode: MindMapNode?
     @State private var isShowingEditSheet = false
     @State private var scale: CGFloat = 1.0
@@ -23,7 +23,7 @@ struct MindMapCanvas: View {
                 .offset(offset)
 
             // 思维导图节点
-            ForEach(nodes) { node in
+            ForEach(viewModel.nodes) { node in
                 MindMapCard(
                     node: node,
                     onDrag: {
@@ -50,9 +50,9 @@ struct MindMapCanvas: View {
             }
 
             // 连接线
-            ForEach(nodes) { node in
+            ForEach(viewModel.nodes) { node in
                 if let parentId = node.parentId,
-                   let parentNode = nodes.first(where: { $0.id == parentId }) {
+                   let parentNode = viewModel.nodes.first(where: { $0.id == parentId }) {
                     ConnectionLine(
                         from: CGPoint(
                             x: parentNode.position.x * scale + offset.width,
@@ -113,32 +113,32 @@ struct MindMapCanvas: View {
             content: "",
             position: CGPoint(x: 200, y: 200)
         )
-        nodes.append(newNode)
+        viewModel.addNode(newNode)
         Task {
             try? await cloudKitManager.saveNode(newNode)
         }
     }
 
     private func updateNodePosition(_ node: MindMapNode, translation: CGSize) {
-        if let index = nodes.firstIndex(where: { $0.id == node.id }) {
-            nodes[index].position = CGPoint(
+        if let index = viewModel.nodes.firstIndex(where: { $0.id == node.id }) {
+            var updatedNode = viewModel.nodes[index]
+            updatedNode.position = CGPoint(
                 x: node.position.x + translation.width / scale,
                 y: node.position.y + translation.height / scale
             )
+            viewModel.updateNode(updatedNode)
         }
     }
 
     private func updateNode(_ node: MindMapNode) {
-        if let index = nodes.firstIndex(where: { $0.id == node.id }) {
-            nodes[index] = node
-            Task {
-                try? await cloudKitManager.saveNode(node)
-            }
+        viewModel.updateNode(node)
+        Task {
+            try? await cloudKitManager.saveNode(node)
         }
     }
 
     private func deleteNode(_ node: MindMapNode) {
-        nodes.removeAll { $0.id == node.id }
+        viewModel.deleteNode(node.id)
         Task {
             try? await cloudKitManager.deleteNode(node.id)
         }
@@ -163,7 +163,9 @@ struct MindMapCanvas: View {
             do {
                 let cloudNodes = try await cloudKitManager.fetchAllNodes()
                 await MainActor.run {
-                    nodes = cloudNodes
+                    // 清空并添加所有节点
+                    viewModel.nodes.removeAll()
+                    viewModel.addNodes(cloudNodes)
                 }
             } catch {
                 print("Sync error: \(error)")
@@ -176,7 +178,7 @@ struct MindMapCanvas: View {
         let cachedNodes = cloudKitManager.loadNodesLocally()
         if !cachedNodes.isEmpty {
             await MainActor.run {
-                nodes = cachedNodes
+                viewModel.addNodes(cachedNodes)
             }
         }
 
@@ -184,7 +186,8 @@ struct MindMapCanvas: View {
         do {
             let cloudNodes = try await cloudKitManager.fetchAllNodes()
             await MainActor.run {
-                nodes = cloudNodes
+                viewModel.nodes.removeAll()
+                viewModel.addNodes(cloudNodes)
                 cloudKitManager.saveNodesLocally(cloudNodes)
             }
         } catch {
@@ -330,5 +333,5 @@ struct EditNodeSheet: View {
 }
 
 #Preview {
-    MindMapCanvas()
+    MindMapCanvas(viewModel: MindMapViewModel())
 }

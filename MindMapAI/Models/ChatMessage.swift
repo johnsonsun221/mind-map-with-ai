@@ -7,6 +7,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var content: String
     var timestamp: Date
     var relatedNodeId: UUID? // 关联的思维导图节点 ID
+    var suggestedNodes: [NodeSuggestion]? // AI 建议的节点
 
     enum MessageRole: String, Codable {
         case user
@@ -18,12 +19,34 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         role: MessageRole,
         content: String,
-        relatedNodeId: UUID? = nil
+        relatedNodeId: UUID? = nil,
+        suggestedNodes: [NodeSuggestion]? = nil
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.timestamp = Date()
         self.relatedNodeId = relatedNodeId
+        self.suggestedNodes = suggestedNodes
+    }
+}
+
+/// AI 建议的节点
+struct NodeSuggestion: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var content: String
+    var color: String
+
+    init(
+        id: UUID = UUID(),
+        title: String,
+        content: String,
+        color: String = "blue"
+    ) {
+        self.id = id
+        self.title = title
+        self.content = content
+        self.color = color
     }
 }

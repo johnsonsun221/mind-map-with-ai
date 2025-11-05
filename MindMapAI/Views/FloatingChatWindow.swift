@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 /// 浮动的 AI 聊天窗口
 struct FloatingChatWindow: View {
+    @ObservedObject var viewModel: MindMapViewModel
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isExpanded = false
@@ -96,7 +97,7 @@ struct FloatingChatWindow: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(messages) { message in
-                            ChatBubble(message: message)
+                            ChatBubble(message: message, viewModel: viewModel)
                                 .id(message.id)
                         }
 
@@ -221,20 +222,47 @@ struct FloatingChatWindow: View {
         // 模拟网络延迟
         try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5秒
 
-        let responses = [
-            "这是一个很好的想法！我建议你可以从以下几个方面展开：\n1. 定义核心功能\n2. 设计用户界面\n3. 考虑技术实现",
-            "让我帮你分析一下这个主题。首先，我们需要理解其核心概念...",
-            "基于你的输入，我认为可以创建几个子主题来更好地组织这些想法。",
-            "这个节点看起来需要更多细节。你想要我帮你扩展哪个方向？",
-            "我注意到这个主题和你之前提到的概念有关联。要不要我帮你建立连接？"
-        ]
+        // 检查用户是否要求创建节点
+        let shouldGenerateNodes = input.lowercased().contains("节点") ||
+                                  input.lowercased().contains("卡片") ||
+                                  input.lowercased().contains("生成") ||
+                                  input.lowercased().contains("创建") ||
+                                  input.lowercased().contains("帮我")
 
-        let randomResponse = responses.randomElement() ?? "收到！让我思考一下..."
+        if shouldGenerateNodes {
+            // 生成节点建议
+            let suggestions = [
+                NodeSuggestion(title: "核心概念", content: "定义主要概念和目标", color: "blue"),
+                NodeSuggestion(title: "关键步骤", content: "列出实现的关键步骤", color: "green"),
+                NodeSuggestion(title: "注意事项", content: "需要注意的重要事项", color: "orange")
+            ]
 
-        await MainActor.run {
-            let aiMessage = ChatMessage(role: .assistant, content: randomResponse)
-            messages.append(aiMessage)
-            isProcessing = false
+            await MainActor.run {
+                let aiMessage = ChatMessage(
+                    role: .assistant,
+                    content: "我为你准备了几个节点建议，点击下面的按钮可以将它们添加到思维导图中：",
+                    suggestedNodes: suggestions
+                )
+                messages.append(aiMessage)
+                isProcessing = false
+            }
+        } else {
+            // 普通响应
+            let responses = [
+                "这是一个很好的想法！我建议你可以从以下几个方面展开：\n1. 定义核心功能\n2. 设计用户界面\n3. 考虑技术实现",
+                "让我帮你分析一下这个主题。首先，我们需要理解其核心概念...",
+                "基于你的输入，我认为可以创建几个子主题来更好地组织这些想法。想要我帮你生成一些节点吗？",
+                "这个节点看起来需要更多细节。你想要我帮你扩展哪个方向？",
+                "我注意到这个主题和你之前提到的概念有关联。要不要我帮你建立连接？"
+            ]
+
+            let randomResponse = responses.randomElement() ?? "收到！让我思考一下..."
+
+            await MainActor.run {
+                let aiMessage = ChatMessage(role: .assistant, content: randomResponse)
+                messages.append(aiMessage)
+                isProcessing = false
+            }
         }
     }
 
@@ -269,6 +297,7 @@ struct FloatingChatWindow: View {
 // MARK: - 聊天气泡
 struct ChatBubble: View {
     let message: ChatMessage
+    @ObservedObject var viewModel: MindMapViewModel
 
     var body: some View {
         HStack {
@@ -276,7 +305,8 @@ struct ChatBubble: View {
                 Spacer()
             }
 
-            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+            VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 8) {
+                // 消息内容
                 Text(message.content)
                     .padding(12)
                     .background(
@@ -284,6 +314,25 @@ struct ChatBubble: View {
                             .fill(message.role == .user ? Color.blue : Color.gray.opacity(0.2))
                     )
                     .foregroundColor(message.role == .user ? .white : .primary)
+
+                // 节点建议（如果有）
+                if let suggestions = message.suggestedNodes, !suggestions.isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(suggestions) { suggestion in
+                            NodeSuggestionButton(
+                                suggestion: suggestion,
+                                onCreateNode: {
+                                    viewModel.createNodeFromAISuggestion(
+                                        title: suggestion.title,
+                                        content: suggestion.content,
+                                        color: suggestion.color
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    .padding(.top, 4)
+                }
 
                 Text(formatTime(message.timestamp))
                     .font(.caption2)
@@ -304,9 +353,64 @@ struct ChatBubble: View {
     }
 }
 
+// MARK: - 节点建议按钮
+struct NodeSuggestionButton: View {
+    let suggestion: NodeSuggestion
+    let onCreateNode: () -> Void
+    @State private var isCreated = false
+
+    var body: some View {
+        Button(action: {
+            onCreateNode()
+            withAnimation {
+                isCreated = true
+            }
+        }) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(colorForName(suggestion.color))
+                    .frame(width: 12, height: 12)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(suggestion.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(suggestion.content)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: isCreated ? "checkmark.circle.fill" : "plus.circle")
+                    .foregroundColor(isCreated ? .green : .blue)
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(UIColor.secondarySystemBackground))
+            )
+        }
+        .disabled(isCreated)
+    }
+
+    private func colorForName(_ name: String) -> Color {
+        switch name {
+        case "blue": return .blue
+        case "green": return .green
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "red": return .red
+        case "yellow": return .yellow
+        default: return .blue
+        }
+    }
+}
+
 #Preview {
     ZStack {
         Color.gray.opacity(0.1).ignoresSafeArea()
-        FloatingChatWindow()
+        FloatingChatWindow(viewModel: MindMapViewModel())
     }
 }
