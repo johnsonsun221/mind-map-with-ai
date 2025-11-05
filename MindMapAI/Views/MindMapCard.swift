@@ -10,6 +10,7 @@ struct MindMapCard: View {
     var onStartConnection: (() -> Void)? = nil
 
     @State private var isDragging = false
+    @State private var showActionMenu = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -21,11 +22,22 @@ struct MindMapCard: View {
 
                 Spacer()
 
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
+                Menu {
+                    if let onStartConnection = onStartConnection {
+                        Button(action: onStartConnection) {
+                            Label("创建连接", systemImage: "link.circle")
+                        }
+                    }
+
+                    Button(role: .destructive, action: onDelete) {
+                        Label("删除节点", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle.fill")
                         .foregroundColor(.white.opacity(0.7))
                         .font(.system(size: 16))
                 }
+                .menuStyle(.borderlessButton)
             }
 
             if !node.content.isEmpty {
@@ -61,17 +73,6 @@ struct MindMapCard: View {
         .onLongPressGesture(minimumDuration: 0.5) {
             // 长按开始连接
             onStartConnection?()
-        }
-        .contextMenu {
-            if let onStartConnection = onStartConnection {
-                Button(action: onStartConnection) {
-                    Label("创建连接", systemImage: "link.circle")
-                }
-            }
-
-            Button(role: .destructive, action: onDelete) {
-                Label("删除节点", systemImage: "trash")
-            }
         }
         .onDrag {
             isDragging = true
