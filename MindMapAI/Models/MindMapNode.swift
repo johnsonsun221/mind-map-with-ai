@@ -33,6 +33,40 @@ struct MindMapNode: Identifiable, Codable, Equatable {
         self.updatedAt = Date()
     }
 
+    // MARK: - Codable
+    enum CodingKeys: String, CodingKey {
+        case id, title, content, positionX, positionY, color, parentId, childrenIds, createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        content = try container.decode(String.self, forKey: .content)
+        let x = try container.decode(CGFloat.self, forKey: .positionX)
+        let y = try container.decode(CGFloat.self, forKey: .positionY)
+        position = CGPoint(x: x, y: y)
+        color = try container.decode(String.self, forKey: .color)
+        parentId = try container.decodeIfPresent(UUID.self, forKey: .parentId)
+        childrenIds = try container.decode([UUID].self, forKey: .childrenIds)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encode(content, forKey: .content)
+        try container.encode(position.x, forKey: .positionX)
+        try container.encode(position.y, forKey: .positionY)
+        try container.encode(color, forKey: .color)
+        try container.encodeIfPresent(parentId, forKey: .parentId)
+        try container.encode(childrenIds, forKey: .childrenIds)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
+
     // 获取颜色
     var colorValue: Color {
         switch color {

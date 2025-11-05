@@ -6,7 +6,7 @@ struct FloatingChatWindow: View {
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var isExpanded = false
-    @State private var position: CGPoint = CGPoint(x: UIScreen.main.bounds.width - 60, y: UIScreen.main.bounds.height - 150)
+    @State private var position: CGPoint = .zero
     @State private var isDragging = false
     @State private var isProcessing = false
 
@@ -14,22 +14,32 @@ struct FloatingChatWindow: View {
     @State private var isDropTargeted = false
 
     var body: some View {
-        ZStack {
-            if isExpanded {
-                // 展开状态：完整聊天界面
-                expandedChatView
-                    .transition(.scale.combined(with: .opacity))
-            } else {
-                // 收缩状态：浮动按钮
-                collapsedButton
-                    .transition(.scale.combined(with: .opacity))
+        GeometryReader { geometry in
+            ZStack {
+                if isExpanded {
+                    // 展开状态：完整聊天界面
+                    expandedChatView(in: geometry)
+                        .transition(.scale.combined(with: .opacity))
+                } else {
+                    // 收缩状态：浮动按钮
+                    collapsedButton(in: geometry)
+                        .transition(.scale.combined(with: .opacity))
+                }
             }
+            .onAppear {
+                if position == .zero {
+                    position = CGPoint(
+                        x: geometry.size.width - 60,
+                        y: geometry.size.height - 150
+                    )
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isExpanded)
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isExpanded)
     }
 
     // MARK: - 收缩状态的浮动按钮
-    private var collapsedButton: some View {
+    private func collapsedButton(in geometry: GeometryProxy) -> some View {
         Button(action: {
             isExpanded = true
         }) {
@@ -76,7 +86,7 @@ struct FloatingChatWindow: View {
     }
 
     // MARK: - 展开状态的聊天界面
-    private var expandedChatView: some View {
+    private func expandedChatView(in geometry: GeometryProxy) -> some View {
         VStack(spacing: 0) {
             // 标题栏
             chatHeader
@@ -136,7 +146,7 @@ struct FloatingChatWindow: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(isDropTargeted ? Color.green : Color.clear, lineWidth: 3)
         )
-        .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
+        .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
         .onDrop(of: [UTType.data], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers: providers)
             return true
