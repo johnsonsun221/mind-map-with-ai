@@ -17,6 +17,7 @@
 		A10000001B0000001000008 /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000001A0000001000008 /* ChatMessage.swift */; };
 		A10000001B0000001000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000001A0000001000009 /* Assets.xcassets */; };
 		A10000001B0000001000010 /* MindMapViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000001A0000001000011 /* MindMapViewModel.swift */; };
+		A10000001B0000001000014 /* NodeConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000001A0000001000015 /* NodeConnection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,6 +33,7 @@
 		A10000001A0000001000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000001A0000001000010 /* MindMapAI.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MindMapAI.entitlements; sourceTree = "<group>"; };
 		A10000001A0000001000011 /* MindMapViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindMapViewModel.swift; sourceTree = "<group>"; };
+		A10000001A0000001000015 /* NodeConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeConnection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,6 +82,7 @@
 			children = (
 				A10000001A0000001000003 /* MindMapNode.swift */,
 				A10000001A0000001000008 /* ChatMessage.swift */,
+				A10000001A0000001000015 /* NodeConnection.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -181,6 +184,7 @@
 				A10000001B0000001000007 /* CloudKitManager.swift in Sources */,
 				A10000001B0000001000008 /* ChatMessage.swift in Sources */,
 				A10000001B0000001000010 /* MindMapViewModel.swift in Sources */,
+				A10000001B0000001000014 /* NodeConnection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

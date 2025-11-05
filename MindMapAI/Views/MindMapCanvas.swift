@@ -14,6 +14,10 @@ struct MindMapCanvas: View {
     @State private var draggingNodeId: UUID?
     @State private var dragStartPosition: CGPoint = .zero
 
+    // 连接管理
+    @State private var selectedConnection: UUID?
+    @State private var showConnectionAlert = false
+
     var body: some View {
         ZStack {
             // 背景
@@ -34,12 +38,26 @@ struct MindMapCanvas: View {
                         // 仅用于标识拖动开始
                     },
                     onTap: {
-                        selectedNode = node
-                        isShowingEditSheet = true
+                        if viewModel.isConnectionMode {
+                            // 连接模式：完成连接
+                            viewModel.completeConnection(to: node.id)
+                        } else {
+                            // 普通模式：编辑节点
+                            selectedNode = node
+                            isShowingEditSheet = true
+                        }
                     },
                     onDelete: {
                         deleteNode(node)
                     }
+                )
+                .overlay(
+                    // 连接模式下高亮起始节点
+                    viewModel.connectionStartNode == node.id ?
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.blue, lineWidth: 3)
+                        .padding(-4)
+                    : nil
                 )
                 .position(
                     x: node.position.x * scale + offset.width,
@@ -75,22 +93,48 @@ struct MindMapCanvas: View {
                 )
             }
 
-            // 连接线
-            ForEach(viewModel.nodes) { node in
-                if let parentId = node.parentId,
-                   let parentNode = viewModel.nodes.first(where: { $0.id == parentId }) {
+            // 连接线 - 显示所有连接
+            ForEach(viewModel.connections) { connection in
+                if let fromNode = viewModel.nodes.first(where: { $0.id == connection.fromNodeId }),
+                   let toNode = viewModel.nodes.first(where: { $0.id == connection.toNodeId }) {
                     ConnectionLine(
                         from: CGPoint(
-                            x: parentNode.position.x * scale + offset.width,
-                            y: parentNode.position.y * scale + offset.height
+                            x: fromNode.position.x * scale + offset.width,
+                            y: fromNode.position.y * scale + offset.height
                         ),
                         to: CGPoint(
-                            x: node.position.x * scale + offset.width,
-                            y: node.position.y * scale + offset.height
+                            x: toNode.position.x * scale + offset.width,
+                            y: toNode.position.y * scale + offset.height
                         )
                     )
-                    .stroke(Color.gray.opacity(0.5), lineWidth: 2)
+                    .stroke(
+                        connectionColor(for: connection.connectionType),
+                        style: StrokeStyle(
+                            lineWidth: 2,
+                            dash: connection.connectionType == .related ? [5, 5] : []
+                        )
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // 点击连接线可以删除
+                        selectedConnection = connection.id
+                    }
                 }
+            }
+
+            // 连接模式指示线
+            if viewModel.isConnectionMode,
+               let startNodeId = viewModel.connectionStartNode,
+               let startNode = viewModel.nodes.first(where: { $0.id == startNodeId }) {
+                Path { path in
+                    let startPoint = CGPoint(
+                        x: startNode.position.x * scale + offset.width,
+                        y: startNode.position.y * scale + offset.height
+                    )
+                    path.move(to: startPoint)
+                    path.addLine(to: startPoint) // 这条线在用户移动时会更新
+                }
+                .stroke(Color.blue.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
             }
         }
         .gesture(
@@ -116,7 +160,9 @@ struct MindMapCanvas: View {
                 onAddNode: addNode,
                 onZoomIn: zoomIn,
                 onZoomOut: zoomOut,
-                onSync: syncWithCloud
+                onSync: syncWithCloud,
+                onToggleConnection: toggleConnectionMode,
+                isConnectionMode: viewModel.isConnectionMode
             )
             .padding()
         }
@@ -126,6 +172,22 @@ struct MindMapCanvas: View {
                     updateNode(updatedNode)
                 }
             }
+        }
+        .alert("删除连接？", isPresented: Binding(
+            get: { selectedConnection != nil },
+            set: { if !$0 { selectedConnection = nil } }
+        )) {
+            Button("取消", role: .cancel) {
+                selectedConnection = nil
+            }
+            Button("删除", role: .destructive) {
+                if let connId = selectedConnection {
+                    viewModel.deleteConnection(connId)
+                    selectedConnection = nil
+                }
+            }
+        } message: {
+            Text("是否要删除这条连接线？")
         }
         .task {
             await loadNodes()
@@ -164,6 +226,27 @@ struct MindMapCanvas: View {
         viewModel.deleteNode(node.id)
         Task {
             try? await cloudKitManager.deleteNode(node.id)
+        }
+    }
+
+    // MARK: - 连接操作
+    private func toggleConnectionMode() {
+        if viewModel.isConnectionMode {
+            viewModel.cancelConnection()
+        } else {
+            // 需要先选择一个节点来开始连接
+            // 这里可以显示一个提示
+        }
+    }
+
+    private func connectionColor(for type: NodeConnection.ConnectionType) -> Color {
+        switch type {
+        case .parent:
+            return Color.gray.opacity(0.5)
+        case .related:
+            return Color.blue.opacity(0.6)
+        case .reference:
+            return Color.purple.opacity(0.6)
         }
     }
 
@@ -288,6 +371,8 @@ struct ToolBar: View {
     let onZoomIn: () -> Void
     let onZoomOut: () -> Void
     let onSync: () -> Void
+    let onToggleConnection: () -> Void
+    let isConnectionMode: Bool
 
     var body: some View {
         VStack(spacing: 12) {
@@ -296,6 +381,16 @@ struct ToolBar: View {
                     .font(.system(size: 30))
                     .foregroundColor(.blue)
             }
+
+            Button(action: onToggleConnection) {
+                Image(systemName: isConnectionMode ? "link.circle.fill" : "link.circle")
+                    .font(.system(size: 30))
+                    .foregroundColor(isConnectionMode ? .green : .blue)
+            }
+
+            Divider()
+                .frame(height: 2)
+                .background(Color.gray.opacity(0.3))
 
             Button(action: onZoomIn) {
                 Image(systemName: "plus.magnifyingglass")

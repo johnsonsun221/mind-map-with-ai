@@ -7,6 +7,7 @@ struct MindMapCard: View {
     let onDrag: () -> Void
     let onTap: () -> Void
     let onDelete: () -> Void
+    var onStartConnection: (() -> Void)? = nil
 
     @State private var isDragging = false
 
@@ -56,6 +57,21 @@ struct MindMapCard: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
         .onTapGesture {
             onTap()
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            // 长按开始连接
+            onStartConnection?()
+        }
+        .contextMenu {
+            if let onStartConnection = onStartConnection {
+                Button(action: onStartConnection) {
+                    Label("创建连接", systemImage: "link.circle")
+                }
+            }
+
+            Button(role: .destructive, action: onDelete) {
+                Label("删除节点", systemImage: "trash")
+            }
         }
         .onDrag {
             isDragging = true
