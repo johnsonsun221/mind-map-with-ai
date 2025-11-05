@@ -291,10 +291,13 @@ struct MindMapCanvas: View {
         // 然后从云端同步
         do {
             let cloudNodes = try await cloudKitManager.fetchAllNodes()
-            await MainActor.run {
-                viewModel.nodes.removeAll()
-                viewModel.addNodes(cloudNodes)
-                cloudKitManager.saveNodesLocally(cloudNodes)
+            // 只有当云端有数据时才替换本地数据
+            if !cloudNodes.isEmpty {
+                await MainActor.run {
+                    viewModel.nodes.removeAll()
+                    viewModel.addNodes(cloudNodes)
+                    cloudKitManager.saveNodesLocally(cloudNodes)
+                }
             }
         } catch {
             print("Load error: \(error)")
