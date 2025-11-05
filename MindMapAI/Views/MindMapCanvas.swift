@@ -10,6 +10,10 @@ struct MindMapCanvas: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
 
+    // 拖动状态管理
+    @State private var draggingNodeId: UUID?
+    @State private var dragStartPosition: CGPoint = .zero
+
     var body: some View {
         ZStack {
             // 背景
@@ -27,7 +31,7 @@ struct MindMapCanvas: View {
                 MindMapCard(
                     node: node,
                     onDrag: {
-                        selectedNode = node
+                        // 仅用于标识拖动开始
                     },
                     onTap: {
                         selectedNode = node
@@ -44,7 +48,29 @@ struct MindMapCanvas: View {
                 .gesture(
                     DragGesture()
                         .onChanged { value in
-                            updateNodePosition(node, translation: value.translation)
+                            // 第一次拖动时保存起始位置
+                            if draggingNodeId != node.id {
+                                draggingNodeId = node.id
+                                dragStartPosition = node.position
+                            }
+
+                            // 使用起始位置 + translation 来计算新位置
+                            let newPosition = CGPoint(
+                                x: dragStartPosition.x + value.translation.width / scale,
+                                y: dragStartPosition.y + value.translation.height / scale
+                            )
+                            updateNodePositionDirect(node.id, newPosition: newPosition)
+                        }
+                        .onEnded { _ in
+                            // 拖动结束，清除状态
+                            draggingNodeId = nil
+
+                            // 保存到云端
+                            if let updatedNode = viewModel.nodes.first(where: { $0.id == node.id }) {
+                                Task {
+                                    try? await cloudKitManager.saveNode(updatedNode)
+                                }
+                            }
                         }
                 )
             }
@@ -119,13 +145,10 @@ struct MindMapCanvas: View {
         }
     }
 
-    private func updateNodePosition(_ node: MindMapNode, translation: CGSize) {
-        if let index = viewModel.nodes.firstIndex(where: { $0.id == node.id }) {
+    private func updateNodePositionDirect(_ nodeId: UUID, newPosition: CGPoint) {
+        if let index = viewModel.nodes.firstIndex(where: { $0.id == nodeId }) {
             var updatedNode = viewModel.nodes[index]
-            updatedNode.position = CGPoint(
-                x: node.position.x + translation.width / scale,
-                y: node.position.y + translation.height / scale
-            )
+            updatedNode.position = newPosition
             viewModel.updateNode(updatedNode)
         }
     }
