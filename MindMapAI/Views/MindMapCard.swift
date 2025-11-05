@@ -45,7 +45,8 @@ struct MindMapCard: View {
             }
         }
         .padding()
-        .frame(width: 200, minHeight: 120)
+        .frame(width: 200)
+        .frame(minHeight: 120)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(node.colorValue)

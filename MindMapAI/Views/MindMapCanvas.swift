@@ -294,7 +294,7 @@ struct EditNodeSheet: View {
 
                 Section("内容") {
                     TextEditor(text: $node.content)
-                        .frame(minHeight: 100)
+                        .frame(height: 100)
                 }
 
                 Section("颜色") {
