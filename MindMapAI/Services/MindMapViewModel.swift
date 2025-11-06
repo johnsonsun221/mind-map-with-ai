@@ -50,6 +50,77 @@ class MindMapViewModel: ObservableObject {
         addNode(newNode)
     }
 
+    // 为指定节点创建子节点
+    func createChildNode(for parentId: UUID) -> MindMapNode {
+        guard let parentNode = nodes.first(where: { $0.id == parentId }) else {
+            // 如果找不到父节点，创建一个普通节点
+            let position = calculateNewNodePosition()
+            let newNode = MindMapNode(
+                title: "新节点",
+                content: "",
+                position: position
+            )
+            addNode(newNode)
+            return newNode
+        }
+
+        // 计算子节点位置（在父节点下方）
+        let childPosition = CGPoint(
+            x: parentNode.position.x + CGFloat((parentNode.childrenIds.count % 3 - 1)) * 150,
+            y: parentNode.position.y + 150
+        )
+
+        var newNode = MindMapNode(
+            title: "新子节点",
+            content: "",
+            position: childPosition,
+            parentId: parentId
+        )
+
+        addNode(newNode)
+
+        // 更新父节点的子节点列表
+        if let parentIndex = nodes.firstIndex(where: { $0.id == parentId }) {
+            nodes[parentIndex].childrenIds.append(newNode.id)
+        }
+
+        // 创建父子连接
+        createConnection(from: parentId, to: newNode.id, type: .parent)
+
+        return newNode
+    }
+
+    // 为指定节点设置父节点
+    func setParent(childId: UUID, parentId: UUID?) {
+        guard let childIndex = nodes.firstIndex(where: { $0.id == childId }) else { return }
+
+        // 移除旧的父子关系
+        if let oldParentId = nodes[childIndex].parentId {
+            // 从旧父节点的子节点列表中移除
+            if let oldParentIndex = nodes.firstIndex(where: { $0.id == oldParentId }) {
+                nodes[oldParentIndex].childrenIds.removeAll { $0 == childId }
+            }
+            // 删除旧的父子连接
+            connections.removeAll {
+                $0.fromNodeId == oldParentId && $0.toNodeId == childId && $0.connectionType == .parent
+            }
+        }
+
+        // 设置新的父节点
+        nodes[childIndex].parentId = parentId
+
+        if let newParentId = parentId {
+            // 添加到新父节点的子节点列表
+            if let newParentIndex = nodes.firstIndex(where: { $0.id == newParentId }) {
+                if !nodes[newParentIndex].childrenIds.contains(childId) {
+                    nodes[newParentIndex].childrenIds.append(childId)
+                }
+            }
+            // 创建新的父子连接
+            createConnection(from: newParentId, to: childId, type: .parent)
+        }
+    }
+
     // 计算新节点位置，避免与现有节点重叠
     private func calculateNewNodePosition() -> CGPoint {
         if nodes.isEmpty {

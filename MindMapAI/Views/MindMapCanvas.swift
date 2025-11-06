@@ -49,6 +49,14 @@ struct MindMapCanvas: View {
                     },
                     onDelete: {
                         deleteNode(node)
+                    },
+                    onStartConnection: {
+                        // 长按开始连接
+                        viewModel.startConnection(from: node.id)
+                    },
+                    onAddChild: {
+                        // 添加子节点
+                        addChildNode(for: node.id)
                     }
                 )
                 .overlay(
@@ -168,9 +176,16 @@ struct MindMapCanvas: View {
         }
         .sheet(isPresented: $isShowingEditSheet) {
             if let node = selectedNode {
-                EditNodeSheet(node: node) { updatedNode in
-                    updateNode(updatedNode)
-                }
+                EditNodeSheet(
+                    node: node,
+                    availableNodes: viewModel.nodes.filter { $0.id != node.id },
+                    onSave: { updatedNode in
+                        updateNode(updatedNode)
+                    },
+                    onParentChange: { newParentId in
+                        viewModel.setParent(childId: node.id, parentId: newParentId)
+                    }
+                )
             }
         }
         .alert("删除连接？", isPresented: Binding(
@@ -226,6 +241,13 @@ struct MindMapCanvas: View {
         viewModel.deleteNode(node.id)
         Task {
             try? await cloudKitManager.deleteNode(node.id)
+        }
+    }
+
+    private func addChildNode(for parentId: UUID) {
+        let newNode = viewModel.createChildNode(for: parentId)
+        Task {
+            try? await cloudKitManager.saveNode(newNode)
         }
     }
 
@@ -426,11 +448,23 @@ struct ToolBar: View {
 struct EditNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var node: MindMapNode
-    let onSave: (MindMapNode) -> Void
+    @State private var selectedParentId: UUID?
 
-    init(node: MindMapNode, onSave: @escaping (MindMapNode) -> Void) {
+    let availableNodes: [MindMapNode]
+    let onSave: (MindMapNode) -> Void
+    let onParentChange: ((UUID?) -> Void)?
+
+    init(
+        node: MindMapNode,
+        availableNodes: [MindMapNode] = [],
+        onSave: @escaping (MindMapNode) -> Void,
+        onParentChange: ((UUID?) -> Void)? = nil
+    ) {
         _node = State(initialValue: node)
+        _selectedParentId = State(initialValue: node.parentId)
+        self.availableNodes = availableNodes
         self.onSave = onSave
+        self.onParentChange = onParentChange
     }
 
     var body: some View {
@@ -456,6 +490,18 @@ struct EditNodeSheet: View {
                         Text("黄色").tag("yellow")
                     }
                 }
+
+                if !availableNodes.isEmpty {
+                    Section("父节点") {
+                        Picker("选择父节点", selection: $selectedParentId) {
+                            Text("无父节点").tag(nil as UUID?)
+                            ForEach(availableNodes) { availableNode in
+                                Text(availableNode.title).tag(availableNode.id as UUID?)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                }
             }
             .navigationTitle("编辑节点")
             .navigationBarTitleDisplayMode(.inline)
@@ -469,6 +515,12 @@ struct EditNodeSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
                         onSave(node)
+
+                        // 如果父节点发生变化，调用回调
+                        if selectedParentId != node.parentId {
+                            onParentChange?(selectedParentId)
+                        }
+
                         dismiss()
                     }
                 }

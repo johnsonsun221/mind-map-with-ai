@@ -8,6 +8,7 @@ struct MindMapCard: View {
     let onTap: () -> Void
     let onDelete: () -> Void
     var onStartConnection: (() -> Void)? = nil
+    var onAddChild: (() -> Void)? = nil
 
     @State private var isDragging = false
     @State private var showActionMenu = false
@@ -23,11 +24,19 @@ struct MindMapCard: View {
                 Spacer()
 
                 Menu {
+                    if let onAddChild = onAddChild {
+                        Button(action: onAddChild) {
+                            Label("添加子节点", systemImage: "plus.circle")
+                        }
+                    }
+
                     if let onStartConnection = onStartConnection {
                         Button(action: onStartConnection) {
                             Label("创建连接", systemImage: "link.circle")
                         }
                     }
+
+                    Divider()
 
                     Button(role: .destructive, action: onDelete) {
                         Label("删除节点", systemImage: "trash")
